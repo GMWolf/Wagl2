@@ -1,0 +1,2 @@
+add_subdirectory(SDF)
+add_subdirectory(sparseAtlasTest)
