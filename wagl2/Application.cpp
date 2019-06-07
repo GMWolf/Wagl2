@@ -10,10 +10,15 @@ wagl::Application::Application(const wagl::AppConfig &config) :
 
     window.mouseButtonCallback = [this](Context*,int mb, int action, int mods) {
         glm::vec2 mousePos = window.getMousePos();
-        if (action == GLFW_PRESS) {
-            inputMultiplexer.mouseButtonPress(mouseButtons[mb], mousePos);
+        switch (action) {
+            case GLFW_PRESS:
+                inputMultiplexer.mouseButtonPress(mb, mousePos);
+                break;
+            case GLFW_RELEASE:
+                inputMultiplexer.mouseButtonRelease(mb, mousePos);
+                break;
+            default:;
         }
-
     };
 
 }

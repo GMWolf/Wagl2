@@ -10,16 +10,14 @@
 
 namespace wagl {
 
-    enum class MouseButton {
-        LEFT,
-        RIGHT,
-        MIDDLE
-    };
+    using MouseButton = int;
+    using KeyboardKey = int;
 
     class InputProcessor {
     public:
         virtual bool mouseButtonPress(MouseButton button, glm::vec2 mousePos) = 0;
         virtual bool mouseButtonRelease(MouseButton button, glm::vec2 mousePos) = 0;
+        virtual bool keyDown(KeyboardKey key) = 0;
     };
 
     class DefaultInputProcessor : public InputProcessor {
@@ -28,6 +26,9 @@ namespace wagl {
             return false;
         };
         bool mouseButtonRelease(MouseButton button, glm::vec2 mousePos) override  {
+            return false;
+        }
+        bool keyDown(KeyboardKey key) override {
             return false;
         }
     };
@@ -46,6 +47,15 @@ namespace wagl {
         bool mouseButtonRelease(MouseButton button, glm::vec2 mousePos) override {
             for(InputProcessor* processor : processors) {
                 if (processor->mouseButtonRelease(button, mousePos)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        bool keyDown(KeyboardKey key) override {
+            for(InputProcessor* processor : processors) {
+                if (processor->keyDown(key)) {
                     return true;
                 }
             }

@@ -14,13 +14,13 @@ in Vertex {
 layout(binding = TEXTURE_BLOCK_BINDING) uniform Textures {
     sampler2D albedo;
     sampler2D metalRoughness;
-    sampler2D emmisive;
+    sampler2D emissive;
     sampler2D normal;
     sampler2D AO;
 } textures;
 
 layout(location = 0) out vec4 outColor;
-layout(location = 1) out vec4 outBright;
+//layout(location = 1) out vec4 outBright;
 
 void main() {
 
@@ -28,7 +28,7 @@ void main() {
     float metal = metalRoughness.b;
     float roughness = metalRoughness.g;
     vec3 albedo = texture(textures.albedo, IN.texCoord).xyz;
-    vec3 emmisive = texture(textures.emmisive, IN.texCoord).xyz;
+    vec3 emissive = texture(textures.emissive, IN.texCoord).xyz;
     float AO = texture(textures.AO, IN.texCoord).x;
     vec3 normalMap = texture(textures.normal, IN.texCoord).xyz * 2.0 - 1.0;
     normalMap.y *= -1;
@@ -58,16 +58,16 @@ void main() {
     float NdotL = max(dot(N, L), 0.0);
     vec3 radiance = vec3(5,5,5) * AO ;
     outColor.rgb = (kD * albedo / PI + specular) * radiance * NdotL;
-    outColor.rgb += emmisive * 5.0;
+    outColor.rgb += emissive * 5.0;
     outColor.rgb += albedo * 0.03 * AO;
     outColor.a = 1.0;
 
     float brightness = dot(outColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-    if (brightness > 1) {
+   /* if (brightness > 1) {
         outBright = vec4(outColor.rgb, 1.0);
     } else {
         outBright = vec4(0,0,0,1.0);
-    }
+    }*/
 
     //outColor.rgb = vec3(roughness);
 }

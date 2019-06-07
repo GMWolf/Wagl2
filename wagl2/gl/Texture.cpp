@@ -138,6 +138,11 @@ void wagl::gl::Texture::pageCommitment(GLint level, GLint xoffset, GLint yoffset
     glTexturePageCommitmentEXT(id, level, xoffset, yoffset, zoffset, width, height, depth, commit);
 }
 
+void wagl::gl::Texture::compressedSubmiage2D(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height,
+                                             GLenum format, GLsizei imageSize, const void *data) {
+    glCompressedTextureSubImage2D(id, level, xoffset, yoffset, width, height, format, imageSize, data);
+}
+
 
 wagl::gl::Sampler::Sampler() {
     glCreateSamplers(1, &id);

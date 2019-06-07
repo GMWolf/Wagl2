@@ -26,7 +26,7 @@ wagl::gl::Texture wagl::loadTexture(const std::string &fileName) {
     for(size_t level = 0; level < gliTex.levels(); level++) {
         auto extent = gliTex.extent(level);
         if(gli::is_compressed(gliTex.format())) {
-            //set compressed data
+            texture.compressedSubmiage2D(level, 0, 0, extent.x, extent.y, format.Internal, gliTex.size(level), gliTex.data(0, 0, level));
         } else {
             texture.subimage2D(level, 0, 0, extent.x, extent.y, format.External, format.Type, gliTex.data(0, 0, level));
         }

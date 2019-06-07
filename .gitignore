@@ -1,3 +1,8 @@
 glad/c
 glad/c-debug
 .idea
+
+# Project exclude paths
+/cmake-build-debug/
+/cmake-build-release/
+/cmake-build-release-glad-debug/

@@ -89,6 +89,8 @@ namespace wagl::gl {
 
         void storage3DSparse(GLsizei width, GLsizei height, GLsizei depth, GLsizei levels, GLenum internalFormat);
 
+        void compressedSubmiage2D(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void *data);
+
         void
         subimage2D(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type,
                    const void *data);

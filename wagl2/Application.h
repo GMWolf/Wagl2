@@ -5,6 +5,7 @@
 #ifndef WAGL2_APPLICATION_H
 #define WAGL2_APPLICATION_H
 
+#include <glad/glad.h>
 #include "Window.h"
 #include "InputProcessor.h"
 #include <string>
@@ -22,14 +23,27 @@ namespace wagl {
         explicit Application(const AppConfig& config);
 
         InputMultiplexer inputMultiplexer;
-    private:
-        Window window;
 
-        static constexpr MouseButton mouseButtons[] {
-            MouseButton::LEFT,
-            MouseButton::RIGHT,
-            MouseButton::MIDDLE
-        };
+        template<class L>
+        void run(L fun) {
+            double lastTime = glfwGetTime();
+            while(!window.shouldClose()) {
+                double time = glfwGetTime();
+                float dt = time - lastTime;
+                lastTime = time;
+                processEvents();
+
+                fun(dt);
+
+                window.swapBuffers();
+            }
+        }
+
+        Window window;
+    private:
+        void processEvents() {
+            wagl::pollEvents();
+        }
     };
 
 }
