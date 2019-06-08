@@ -36,4 +36,45 @@ vec3 fresnel(float cosTheta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(1.0-cosTheta, 5.0);
 }
 
+struct PBRFragment {
+    vec3 albedo;
+    float metalicity;
+    float roughness;
+    vec3 emmisivity;
+    vec3 normal;
+    float AO;
+};
+
+struct LightFragment {
+    vec3 lightDirection;
+    vec3 radiance;
+};
+
+vec3 color(PBRFragment f, LightFragment l, vec3 viewDirection) {
+
+    vec3 H = normalize(l.lightDirection + viewDirection);
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, f.albedo, f.metalicity);
+
+    vec3 F = fresnel(max(dot(H, viewDirection), 0.0), F0);
+    float NDF = D_GGX(f.normal, H, f.roughness);
+    float G = G_smith(f.normal, viewDirection, l.lightDirection, f.roughness);
+    vec3 numerator = NDF * G * F;
+
+    float denom = 4.0 * max(dot(f.normal, viewDirection), 0.0) * max(dot(f.normal, l.lightDirection), 0.0);
+    vec3 specular = numerator / max(denom, 0.0001);
+
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - f.metalicity;
+
+    float NdotL = max(dot(f.normal, l.lightDirection), 0.0);
+    vec3 radiance = l.radiance * f.AO;
+
+    vec3 c;
+    c = (kD * f.albedo / PI + specular) * radiance * NdotL;
+    c += f.emmisivity;
+    return c;
+}
+
 #endif //PBR

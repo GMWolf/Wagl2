@@ -5,12 +5,15 @@
 #include "TextureLoad.h"
 
 #include <gli/gli.hpp>
+#include <iostream>
 
 wagl::gl::Texture wagl::loadTexture(const std::string &fileName) {
 
+    std::cout << fileName << std::endl;
+
     gli::texture gliTex = gli::load(fileName.c_str());
     if(gliTex.empty()) {
-        //TODO return something here
+        gl::Texture(GL_TEXTURE_2D);
     }
 
     gli::gl GL(gli::gl::PROFILE_GL33);

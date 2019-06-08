@@ -8,6 +8,7 @@
 #include "Object.h"
 #include <initializer_list>
 #include <variant>
+#include <glm/glm.hpp>
 
 namespace wagl::gl {
 
@@ -98,6 +99,14 @@ namespace wagl::gl {
         void submimage3D(GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height,
                          GLsizei depth, GLenum format, GLenum type, const void *data);
 
+        void clear(GLint level, float value);
+
+        void clear(GLint level, glm::vec3 value);
+
+        void clear(GLint level, glm::vec4 value);
+
+        void clear(GLint level, GLuint value);
+
         TextureHandle getHandle();
 
         TextureHandle getHandle(const Sampler& sampler);
@@ -132,6 +141,8 @@ namespace wagl::gl {
 
         GLsizei width, height, depth, levels;
     };
+
+    glm::ivec3 getFormatPageSize(GLenum target, GLenum format);
 
 }
 

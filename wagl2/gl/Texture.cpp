@@ -143,6 +143,22 @@ void wagl::gl::Texture::compressedSubmiage2D(GLint level, GLint xoffset, GLint y
     glCompressedTextureSubImage2D(id, level, xoffset, yoffset, width, height, format, imageSize, data);
 }
 
+void wagl::gl::Texture::clear(GLint level, float value) {
+    glClearTexImage(id, level, GL_RED, GL_FLOAT, &value);
+}
+
+void wagl::gl::Texture::clear(GLint level, GLuint value) {
+    glClearTexImage(id, level, GL_RED_INTEGER, GL_UNSIGNED_INT, &value);
+}
+
+void wagl::gl::Texture::clear(GLint level, glm::vec3 value) {
+    glClearTexImage(id, level, GL_RGB, GL_FLOAT, &value);
+}
+
+void wagl::gl::Texture::clear(GLint level, glm::vec4 value) {
+    glClearTexImage(id, level, GL_RGBA, GL_FLOAT, &value);
+}
+
 
 wagl::gl::Sampler::Sampler() {
     glCreateSamplers(1, &id);
@@ -169,6 +185,13 @@ void wagl::gl::Sampler::parameter(GLenum name, GLfloat param) {
 }
 
 
+glm::ivec3 wagl::gl::getFormatPageSize(GLenum target, GLenum format) {
+    glm::ivec3 result;
+    glGetInternalformativ( GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_X_ARB, 1, &result.x);
+    glGetInternalformativ( GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_Y_ARB, 1, &result.y);
+    glGetInternalformativ( GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_Z_ARB, 1, &result.z);
+    return result;
+}
 
 
 

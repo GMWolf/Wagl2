@@ -25,6 +25,16 @@ struct SceneInfo {
     glm::vec3 viewPos;
 };
 
+struct TerrainTextures {
+    wagl::gl::TextureHandle albedo;
+    wagl::gl::TextureHandle metal;
+    wagl::gl::TextureHandle roughness;
+    wagl::gl::TextureHandle normal;
+    wagl::gl::TextureHandle emissive;
+
+    wagl::gl::TextureHandle commitment;
+};
+
 void run() {
 
     wagl::Application app({
@@ -44,9 +54,9 @@ void run() {
     wagl::Mesh floor;
     floor.data.vertices = {
             {{-100, 0, -100}, {0, 1, 0}, {0,0}},
-            {{-100, 0, 100}, {0, 1, 0}, {0, 25}},
-            {{100, 0, -100}, {0, 1, 0}, {25, 0}},
-            {{100, 0, 100}, {0, 1, 0}, {25, 25}}
+            {{-100, 0, 100}, {0, 1, 0}, {0, 50}},
+            {{100, 0, -100}, {0, 1, 0}, {50, 0}},
+            {{100, 0, 100}, {0, 1, 0}, {50, 50}}
     };
     floor.data.elements = {
             0, 1, 2, 2, 1, 3
@@ -54,35 +64,53 @@ void run() {
     floor.update();
 
     wagl::gl::Sampler sampler {
-            {GL_TEXTURE_MAX_ANISOTROPY, 8}
+            //{GL_TEXTURE_MAX_ANISOTROPY, 16.0f},
+            {GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR},
+            {GL_TEXTURE_MAG_FILTER, GL_LINEAR}
+    };
+
+    wagl::gl::Sampler nearestSampler {
+            {GL_TEXTURE_MIN_FILTER, GL_NEAREST},
+            {GL_TEXTURE_MAG_FILTER, GL_NEAREST}
     };
 
     struct {
         wagl::gl::Texture albedo = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_albedo.dds");
+        wagl::gl::Texture metallic = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_metallic.dds");
         wagl::gl::Texture normal = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_normal.dds");
-        wagl::gl::Texture metalRoughness = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_metal_roughness.dds");
-        wagl::gl::Texture ao = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_normal.dds");
+        wagl::gl::Texture roughness = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_roughness.dds");
         wagl::gl::Texture emissive = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_emissive.dds");
     } matTextures {};
 
 
-    wagl::gl::Shader pbrShd {
+    glm::uvec2 virtualTexSize = {65536, 65536};
+    glm::ivec3 pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_RGB8);
+
+    glm::uvec2 virtualCommitmentTexSize = {virtualTexSize.x / pageSize.x, virtualTexSize.y / pageSize.y};
+
+    wagl::gl::Texture commitmentTex = wagl::gl::Texture(GL_TEXTURE_2D);
+    commitmentTex.storage2D(virtualCommitmentTexSize.x, virtualCommitmentTexSize.y, 1, GL_R32F);
+    commitmentTex.clear(0, 11.0f);
+
+    wagl::gl::Shader terrainShader {
             {GL_VERTEX_SHADER, wagl::loadFileGLSL("resources/shaders/shader.vert",  "resources/shaders")},
-            {GL_FRAGMENT_SHADER, wagl::loadFileGLSL("resources/shaders/shader.frag", "resources/shaders")}
+            {GL_FRAGMENT_SHADER, wagl::loadFileGLSL("resources/shaders/terrain.frag", "resources/shaders")}
     };
 
-    wagl::UniformBuffer<PBRMaterial> pbrMaterialBuffer;
-    pbrMaterialBuffer->albedo = matTextures.albedo.getHandle(sampler);
-    pbrMaterialBuffer->normal = matTextures.normal.getHandle(sampler);
-    pbrMaterialBuffer->metalRoughness = matTextures.metalRoughness.getHandle(sampler);
-    pbrMaterialBuffer->ao = matTextures.ao.getHandle(sampler);
-    pbrMaterialBuffer->emissive = matTextures.emissive.getHandle(sampler);
+    wagl::UniformBuffer<TerrainTextures> terrainTexturesBuffer;
+    terrainTexturesBuffer->albedo = matTextures.albedo.getHandle(sampler);
+    terrainTexturesBuffer->normal = matTextures.normal.getHandle(sampler);
+    terrainTexturesBuffer->metal = matTextures.metallic.getHandle(sampler);
+    terrainTexturesBuffer->roughness = matTextures.roughness.getHandle(sampler);
+    terrainTexturesBuffer->emissive = matTextures.emissive.getHandle(sampler);
+    terrainTexturesBuffer->commitment = commitmentTex.getHandle(nearestSampler);
 
-    pbrMaterialBuffer->albedo.makeResident();
-    pbrMaterialBuffer->normal.makeResident();
-    pbrMaterialBuffer->metalRoughness.makeResident();
-    pbrMaterialBuffer->ao.makeResident();
-    pbrMaterialBuffer->emissive.makeResident();
+    terrainTexturesBuffer->albedo.makeResident();
+    terrainTexturesBuffer->normal.makeResident();
+    terrainTexturesBuffer->metal.makeResident();
+    terrainTexturesBuffer->roughness.makeResident();
+    terrainTexturesBuffer->emissive.makeResident();
+    terrainTexturesBuffer->commitment.makeResident();
 
     wagl::UniformBuffer<wagl::Transform> transformBlock;
     *transformBlock = {
@@ -108,10 +136,10 @@ void run() {
         sceneInfoBuffer->VP = camera.viewProjection(app.window.getAspect());
         sceneInfoBuffer->viewPos = camera.transform.position;
 
-        pbrShd.use();
+        terrainShader.use();
         sceneInfoBuffer.bind(SCENE_INFO_BINDING);
         transformBlock.bind(TRANSFORM_BLOCK_BINDING);
-        pbrMaterialBuffer.bind(TEXTURE_BLOCK_BINDING);
+        terrainTexturesBuffer.bind(TEXTURE_BLOCK_BINDING);
 
 
         floor.gl.vertexArray.bind();

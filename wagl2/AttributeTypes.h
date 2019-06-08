@@ -32,4 +32,5 @@ struct wagl::attribute_type<T[SIZE]> {
     static const GLint size = SIZE;
     static const GLenum type = attribute_type<T>::type;
 };
+
 #endif //WAGL2_ATTRIBUTETYPES_H
