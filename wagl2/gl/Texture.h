@@ -16,7 +16,6 @@ namespace wagl::gl {
 
     class TextureHandle {
         friend class wagl::gl::Texture;
-
     public:
         TextureHandle();
         TextureHandle(TextureHandle&&) noexcept = default;
@@ -24,12 +23,9 @@ namespace wagl::gl {
         TextureHandle& operator=(TextureHandle&&) noexcept = default;
         TextureHandle& operator=(const TextureHandle&) = default;
         void makeResident();
-
         void makeNonResident();
-
     private:
         GLuint64 id;
-
         explicit TextureHandle(GLuint64 h);
     };
 
@@ -83,12 +79,13 @@ namespace wagl::gl {
         Texture &operator=(const Texture &) = delete;
 
         void storage2D(GLsizei width, GLsizei height, GLsizei levels, GLenum internalFormat);
-
+        void storage2D(glm::ivec2 size, GLsizei levels, GLenum internalFormat);
         void storage2DSparse(GLsizei width, GLsizei height, GLsizei levels, GLenum internalFormat);
-
+        void storage2DSparse(glm::ivec2 size, GLsizei levels, GLenum internalFormat);
         void storage3D(GLsizei width, GLsizei height, GLsizei depth, GLsizei levels, GLenum internalFormat);
-
+        void storage3D(glm::ivec3 size, GLsizei levels, GLenum internalFormat);
         void storage3DSparse(GLsizei width, GLsizei height, GLsizei depth, GLsizei levels, GLenum internalFormat);
+        void storage3DSparse(glm::ivec3 size, GLsizei levels, GLenum internalFormat);
 
         void compressedSubmiage2D(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void *data);
 
@@ -106,6 +103,8 @@ namespace wagl::gl {
         void clear(GLint level, glm::vec4 value);
 
         void clear(GLint level, GLuint value);
+
+        void subClear(GLint level, glm::uvec3 a, glm::uvec3 size, float value);
 
         TextureHandle getHandle();
 
@@ -132,6 +131,8 @@ namespace wagl::gl {
         int getParameteri(GLenum param);
 
         void pageCommitment(GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, bool commit);
+
+        void pageCommitment(GLint level, glm::uvec3 offset, glm::uvec3 size, bool commit);
 
     protected:
 

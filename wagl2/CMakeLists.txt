@@ -39,7 +39,7 @@ add_library(Wagl2
         gl/Fence.cpp
         gl/Fence.h
         util/overloaded.h
-        ui/Layout.h Geom.h InputProcessor.h Application.cpp Application.h ui/Layout.cpp ui/UIRenderBuffer.cpp ui/UIRenderBuffer.h SparseTextureAtlas.cpp SparseTextureAtlas.h util/Matrix.h VirtualTexture.cpp VirtualTexture.h)
+        ui/Layout.h Geom.h InputProcessor.h Application.cpp Application.h ui/Layout.cpp ui/UIRenderBuffer.cpp ui/UIRenderBuffer.h SparseTextureAtlas.cpp SparseTextureAtlas.h util/Matrix.h VirtualTexture.cpp VirtualTexture.h ui/UI.h)
 
 target_link_libraries(Wagl2 PUBLIC glfw glad glm gli tinygltf stb)
 target_include_directories(Wagl2 PUBLIC .)

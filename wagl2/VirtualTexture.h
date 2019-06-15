@@ -7,16 +7,20 @@
 
 #include "gl/Texture.h"
 #include <glm/vec2.hpp>
+#include <vector>
 
 namespace wagl {
 
-    class VirtualTexture {
+    class VirtualTextureMap {
     public:
-        VirtualTexture(glm::uvec2 size, size_t levels, GLenum format);
+        VirtualTextureMap(glm::uvec2 size, size_t levels) : size(size), levels(levels){
+        }
 
     private:
         glm::uvec2 size;
-        gl::Texture texture;
+        size_t levels;
+
+        std::vector<gl::Texture> textures;
     };
 
 }

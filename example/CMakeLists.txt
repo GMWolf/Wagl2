@@ -1,3 +1,4 @@
 add_subdirectory(SDF)
 add_subdirectory(sparseAtlasTest)
 add_subdirectory(virtualTexturing)
+add_subdirectory(ui)

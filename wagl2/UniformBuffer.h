@@ -33,6 +33,7 @@ namespace wagl {
         T* ptr;
     };
 
+
     template<class T>
     void UniformBuffer<T>::bind(GLuint index) const {
         buffer.bindRange(GL_UNIFORM_BUFFER, index, 0, sizeof(T));

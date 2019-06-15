@@ -5,25 +5,18 @@
 #ifndef WAGL2_LAYOUT_H
 #define WAGL2_LAYOUT_H
 
-#include "../Geom.h"
-#include "../InputProcessor.h"
+#include "UI.h"
 #include <memory>
 
 namespace wagl::ui {
 
-    class Layout : public DefaultInputProcessor {
+    class SplitLayout : public Component {
     public:
-        virtual void updateBounds(rect newRect) = 0;
-
-        rect bounds;
-    };
-
-
-    class SplitLayout : public Layout {
-    public:
-        std::unique_ptr<Layout> child[2];
+        std::unique_ptr<Component> child[2];
 
         void updateBounds(rect newRect) override;
+
+        void render(UIContext &ctx) override;
 
         bool mouseButtonPress(MouseButton button, glm::vec2 mousePos) override;
 

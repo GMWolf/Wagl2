@@ -51,9 +51,17 @@ void wagl::gl::Texture::storage2D(GLsizei _width, GLsizei _height, GLsizei _leve
     storage2D_internal(_width, _height, _levels, internalFormat);
 }
 
+void wagl::gl::Texture::storage2D(glm::ivec2 size, GLsizei _levels, GLenum internalFormat) {
+    storage2D(size.x, size.y, _levels, internalFormat);
+}
+
 void wagl::gl::Texture::storage2DSparse(GLsizei _width, GLsizei _height, GLsizei _levels, GLenum internalFormat) {
     parameter(GL_TEXTURE_SPARSE_ARB, true);
     storage2D_internal(_width, _height, _levels, internalFormat);
+}
+
+void wagl::gl::Texture::storage2DSparse(glm::ivec2 size, GLsizei _levels, GLenum internalFormat) {
+    storage2DSparse(size.x, size.y, _levels, internalFormat);
 }
 
 void wagl::gl::Texture::storage3D_internal(GLsizei _width, GLsizei _height, GLsizei _depth, GLsizei _levels, GLenum internalFormat) {
@@ -64,15 +72,21 @@ void wagl::gl::Texture::storage3D_internal(GLsizei _width, GLsizei _height, GLsi
     glTextureStorage3D(id, levels, internalFormat, width, height, depth);
 }
 
-
-
 void wagl::gl::Texture::storage3D(GLsizei _width, GLsizei _height, GLsizei _depth, GLsizei _levels, GLenum internalFormat) {
     storage3D_internal(_width, _height, _depth, _levels, internalFormat);
+}
+
+void wagl::gl::Texture::storage3D(glm::ivec3 size, GLsizei _levels, GLenum internalFormat) {
+    storage3D(size.x, size.y, size.z, _levels, internalFormat);
 }
 
 void wagl::gl::Texture::storage3DSparse(GLsizei _width, GLsizei _height, GLsizei _depth, GLsizei _levels, GLenum internalFormat) {
     parameter(GL_TEXTURE_SPARSE_ARB, true);
     storage3D_internal(_width, _height, _depth, _levels, internalFormat);
+}
+
+void wagl::gl::Texture::storage3DSparse(glm::ivec3 size, GLsizei _levels, GLenum internalFormat) {
+    storage3DSparse(size.x, size.y, size.z, _levels, internalFormat);
 }
 
 void wagl::gl::Texture::subimage2D(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height,
@@ -138,6 +152,10 @@ void wagl::gl::Texture::pageCommitment(GLint level, GLint xoffset, GLint yoffset
     glTexturePageCommitmentEXT(id, level, xoffset, yoffset, zoffset, width, height, depth, commit);
 }
 
+void wagl::gl::Texture::pageCommitment(GLint level, glm::uvec3 offset, glm::uvec3 size, bool commit) {
+    pageCommitment(level, offset.x, offset.y, offset.z, size.x, size.y, size.z, commit);
+}
+
 void wagl::gl::Texture::compressedSubmiage2D(GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height,
                                              GLenum format, GLsizei imageSize, const void *data) {
     glCompressedTextureSubImage2D(id, level, xoffset, yoffset, width, height, format, imageSize, data);
@@ -157,6 +175,10 @@ void wagl::gl::Texture::clear(GLint level, glm::vec3 value) {
 
 void wagl::gl::Texture::clear(GLint level, glm::vec4 value) {
     glClearTexImage(id, level, GL_RGBA, GL_FLOAT, &value);
+}
+
+void wagl::gl::Texture::subClear(GLint level, glm::uvec3 a, glm::uvec3 size, float value) {
+    glClearTexSubImage(id, level, a.x, a.y, a.z, size.x, size.y, size.z, GL_RED, GL_FLOAT, &value);
 }
 
 

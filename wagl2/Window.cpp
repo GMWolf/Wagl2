@@ -147,7 +147,7 @@ void post_call_callback(const char *name, void *funcptr, int len_args, ...) {
         }
 
 #undef ERROR_NAME_CASE
-        errorName += name;
+        (errorName += " in ") += name;
         throw opengl_error(errorName.c_str());
     }
 

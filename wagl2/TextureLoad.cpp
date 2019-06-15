@@ -9,8 +9,6 @@
 
 wagl::gl::Texture wagl::loadTexture(const std::string &fileName) {
 
-    std::cout << fileName << std::endl;
-
     gli::texture gliTex = gli::load(fileName.c_str());
     if(gliTex.empty()) {
         gl::Texture(GL_TEXTURE_2D);

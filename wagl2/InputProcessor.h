@@ -35,6 +35,11 @@ namespace wagl {
 
     class InputMultiplexer : public InputProcessor {
     public:
+
+        void add(InputProcessor* processor) {
+            processors.push_back(processor);
+        }
+
         bool mouseButtonPress(MouseButton button, glm::vec2 mousePos) override {
             for(InputProcessor* processor : processors) {
                 if (processor->mouseButtonPress(button, mousePos)) {

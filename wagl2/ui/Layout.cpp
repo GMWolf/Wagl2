@@ -36,3 +36,7 @@ bool wagl::ui::SplitLayout::mouseButtonPress(wagl::MouseButton button, glm::vec2
 
     return true; //Always capture layout to avoid click through.
 }
+
+void wagl::ui::SplitLayout::render(wagl::ui::UIContext &ctx) {
+
+}

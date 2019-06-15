@@ -23,8 +23,11 @@ layout(binding = TEXTURE_BLOCK_BINDING) uniform Textures {
 } textures;
 
 float availableLod(vec2 uv) {
+    /* texture gather only works if commitment tex resolution mathced other tex
     vec4 g = textureGather(textures.commitment, uv);
     return max(max(g.x, g.y), max(g.z, g.w));
+    */
+    return texture(textures.commitment, uv).r;
 }
 
 vec4 sampleSparse(sampler2D tex, vec2 uv, float maxLod) {
@@ -71,6 +74,7 @@ void main() {
     l.radiance = vec3(1) * 5;
 
     outColor.rgb = color(f, l, normalize(IN.view));
-   // outColor.rgb = texture(textures.commitment, IN.texCoord).rgb;
+    outColor.rgb = 0.1f + texture(textures.commitment, IN.texCoord).rgb / 8.0f;
+    outColor.rgb = f.albedo.rgb;
     outColor.a = 1;
 }

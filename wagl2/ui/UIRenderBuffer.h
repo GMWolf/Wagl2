@@ -21,7 +21,7 @@ namespace wagl::ui {
         const size_t batchSize;
         static const size_t batchCount = 3;
 
-        UIRenderBuffer(size_t batchVertexSize);
+        explicit UIRenderBuffer(size_t batchVertexSize);
 
         void submit();
 
