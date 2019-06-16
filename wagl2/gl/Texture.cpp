@@ -29,7 +29,7 @@ void wagl::gl::ImageHandle::makeNonResident() {
 }
 
 wagl::gl::Texture::Texture(GLenum target) :
-width(0), height(0), depth(0), levels(0)
+target(target), width(0), height(0), depth(0), levels(0), format(0)
 {
     glCreateTextures(target, 1, &id);
 }
@@ -43,6 +43,7 @@ void wagl::gl::Texture::storage2D_internal(GLsizei _width, GLsizei _height, GLsi
     width = _width;
     height = _height;
     depth = 1;
+    format = internalFormat;
     glTextureStorage2D(id, levels, internalFormat, _width, _height);
 }
 
@@ -69,6 +70,7 @@ void wagl::gl::Texture::storage3D_internal(GLsizei _width, GLsizei _height, GLsi
     width = _width;
     height = _height;
     depth = _depth;
+    format = internalFormat;
     glTextureStorage3D(id, levels, internalFormat, width, height, depth);
 }
 
@@ -179,6 +181,10 @@ void wagl::gl::Texture::clear(GLint level, glm::vec4 value) {
 
 void wagl::gl::Texture::subClear(GLint level, glm::uvec3 a, glm::uvec3 size, float value) {
     glClearTexSubImage(id, level, a.x, a.y, a.z, size.x, size.y, size.z, GL_RED, GL_FLOAT, &value);
+}
+
+glm::ivec3 wagl::gl::Texture::getPageSize() const {
+    return getFormatPageSize(target, format);
 }
 
 

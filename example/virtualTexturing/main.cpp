@@ -14,11 +14,11 @@
 #include <iostream>
 #include <gl/FrameBuffer.h>
 #include "VirtualTextureMap.h"
+#include <shaders/fullscreen.h>
 
 struct PBRMaterial {
     wagl::gl::TextureHandle albedo;
     wagl::gl::TextureHandle metalRoughness;
-    wagl::gl::TextureHandle emissive;
     wagl::gl::TextureHandle normal;
     wagl::gl::TextureHandle ao;
 };
@@ -33,7 +33,6 @@ struct TerrainTextures {
     wagl::gl::TextureHandle metal;
     wagl::gl::TextureHandle roughness;
     wagl::gl::TextureHandle normal;
-    wagl::gl::TextureHandle emissive;
 
     wagl::gl::TextureHandle commitment;
 };
@@ -43,7 +42,6 @@ struct GenTexture {
     wagl::gl::TextureHandle metal;
     wagl::gl::TextureHandle roughness;
     wagl::gl::TextureHandle normal;
-    wagl::gl::TextureHandle emissive;
 };
 
 template<size_t LEVELS>
@@ -52,14 +50,13 @@ struct TerrainImages {
     wagl::gl::ImageHandle metal[LEVELS];
     wagl::gl::ImageHandle roughness[LEVELS];
     wagl::gl::ImageHandle normal[LEVELS];
-    wagl::gl::ImageHandle emissive[LEVELS];
 
     wagl::gl::ImageHandle commitment;
 };
 
 struct GenerationInfo {
-    glm::ivec2 offset;
-    glm::ivec2 size;
+    glm::vec2 offset;
+    glm::vec2 size;
     int lod;
 };
 
@@ -107,19 +104,28 @@ void run() {
         wagl::gl::Texture metallic = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_metallic.dds");
         wagl::gl::Texture normal = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_normal.dds");
         wagl::gl::Texture roughness = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_roughness.dds");
-        wagl::gl::Texture emissive = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_emissive.dds");
     } matTextures {};
 
 
     glm::uvec2 virtualTexSize = {2048*8, 2048*8};
     const size_t virtualTexLevels = 8;
-    glm::ivec3 rgb8_pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_RGB8);
-    glm::ivec3 r8_pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_R8);
-    glm::ivec3 rg8_pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_RG8);
-    glm::ivec3 pageSize = glm::max(r8_pageSize, glm::max(rg8_pageSize, rgb8_pageSize));
-    std::cout << "r8_pageSize " << r8_pageSize.x << " " << r8_pageSize.y << "\n";
-    std::cout << "rg8_pageSize " << rg8_pageSize.x << " " << rg8_pageSize.y << "\n";
-    std::cout << "rgb8_pageSize " << rgb8_pageSize.x << " " << rgb8_pageSize.y << "\n";
+
+    struct {
+        wagl::gl::Texture albedo = wagl::gl::Texture(GL_TEXTURE_2D);
+        wagl::gl::Texture metallic = wagl::gl::Texture(GL_TEXTURE_2D);
+        wagl::gl::Texture normal = wagl::gl::Texture(GL_TEXTURE_2D);
+        wagl::gl::Texture roughness = wagl::gl::Texture(GL_TEXTURE_2D);
+    } virtualTextures {};
+    virtualTextures.albedo.storage2DSparse(virtualTexSize, virtualTexLevels, GL_R11F_G11F_B10F);
+    virtualTextures.metallic.storage2DSparse(virtualTexSize, virtualTexLevels, GL_R8);
+    virtualTextures.normal.storage2DSparse(virtualTexSize, virtualTexLevels, GL_RG8);
+    virtualTextures.roughness.storage2DSparse(virtualTexSize, virtualTexLevels, GL_R8);
+
+    glm::ivec3 pageSize = virtualTextures.albedo.getPageSize();
+    pageSize = glm::max(pageSize, virtualTextures.normal.getPageSize());
+    pageSize = glm::max(pageSize, virtualTextures.metallic.getPageSize());
+    pageSize = glm::max(pageSize, virtualTextures.roughness.getPageSize());
+
     std::cout << "pageSize " << pageSize.x << " " << pageSize.y << "\n";
 
     glm::uvec2 virtualCommitmentTexSize = (virtualTexSize + glm::uvec2(pageSize) - 1u) / glm::uvec2(pageSize);
@@ -128,18 +134,7 @@ void run() {
     commitmentTex.storage2D(virtualCommitmentTexSize.x, virtualCommitmentTexSize.y, 1, GL_R32F);
     commitmentTex.clear(0, 11.0f);
 
-    struct {
-        wagl::gl::Texture albedo = wagl::gl::Texture(GL_TEXTURE_2D);
-        wagl::gl::Texture metallic = wagl::gl::Texture(GL_TEXTURE_2D);
-        wagl::gl::Texture normal = wagl::gl::Texture(GL_TEXTURE_2D);
-        wagl::gl::Texture roughness = wagl::gl::Texture(GL_TEXTURE_2D);
-        wagl::gl::Texture emissive = wagl::gl::Texture(GL_TEXTURE_2D);
-    } virtualTextures {};
-    virtualTextures.albedo.storage2DSparse(virtualTexSize, virtualTexLevels, GL_RGBA8);
-    virtualTextures.metallic.storage2DSparse(virtualTexSize, virtualTexLevels, GL_R8);
-    virtualTextures.normal.storage2DSparse(virtualTexSize, virtualTexLevels, GL_RG8);
-    virtualTextures.roughness.storage2DSparse(virtualTexSize, virtualTexLevels, GL_R8);
-    virtualTextures.emissive.storage2DSparse(virtualTexSize, virtualTexLevels, GL_RGBA8);
+
 
     wagl::gl::Shader terrainShader {
             {GL_VERTEX_SHADER, wagl::loadFileGLSL("resources/shaders/shader.vert",  "resources/shaders")},
@@ -149,55 +144,62 @@ void run() {
     wagl::gl::Shader genShd {
             {GL_COMPUTE_SHADER, wagl::loadFileGLSL("resources/shaders/csgeneration.glsl", "resources/shaders")}
     };
+
+    wagl::gl::Shader pipeGenShd {
+            wagl::shd::vs_fullscreen,
+            {GL_FRAGMENT_SHADER, wagl::loadFileGLSL("resources/shaders/terrainGen.frag", "resources/shaders")}
+    };
+
     wagl::UniformBuffer<GenerationInfo> genInfoBuffer;
     wagl::UniformBuffer<GenTexture> genTextureBuffer;
     genTextureBuffer->albedo = matTextures.albedo.getHandle(sampler);
     genTextureBuffer->normal = matTextures.normal.getHandle(sampler);
     genTextureBuffer->metal = matTextures.metallic.getHandle(sampler);
     genTextureBuffer->roughness = matTextures.roughness.getHandle(sampler);
-    genTextureBuffer->emissive = matTextures.emissive.getHandle(sampler);
     genTextureBuffer->albedo.makeResident();
     genTextureBuffer->normal.makeResident();
     genTextureBuffer->metal.makeResident();
     genTextureBuffer->roughness.makeResident();
-    genTextureBuffer->emissive.makeResident();
 
     wagl::UniformBuffer<TerrainTextures> terrainTexturesBuffer;
     terrainTexturesBuffer->albedo = virtualTextures.albedo.getHandle(sampler);
     terrainTexturesBuffer->normal = virtualTextures.normal.getHandle(sampler);
     terrainTexturesBuffer->metal = virtualTextures.metallic.getHandle(sampler);
     terrainTexturesBuffer->roughness = virtualTextures.roughness.getHandle(sampler);
-    terrainTexturesBuffer->emissive = virtualTextures.emissive.getHandle(sampler);
     terrainTexturesBuffer->commitment = commitmentTex.getHandle(nearestSampler);
 
     terrainTexturesBuffer->albedo.makeResident();
     terrainTexturesBuffer->normal.makeResident();
     terrainTexturesBuffer->metal.makeResident();
     terrainTexturesBuffer->roughness.makeResident();
-    terrainTexturesBuffer->emissive.makeResident();
     terrainTexturesBuffer->commitment.makeResident();
 
-
+    wagl::gl::FrameBuffer virtFrameBuffers[virtualTexLevels];
 
     wagl::UniformBuffer<TerrainImages<virtualTexLevels>> terrainImagesBuffer;
     for(int i = 0; i < virtualTexLevels; i++) {
-        terrainImagesBuffer->albedo[i] = virtualTextures.albedo.getImageHandle(i, false, 0, GL_RGBA8);
-        terrainImagesBuffer->albedo[i].makeResident(GL_WRITE_ONLY);
-        terrainImagesBuffer->emissive[i] = virtualTextures.emissive.getImageHandle(i, false, 0, GL_RGBA8);
-        terrainImagesBuffer->emissive[i].makeResident(GL_WRITE_ONLY);
-        terrainImagesBuffer->normal[i] = virtualTextures.normal.getImageHandle(i, false, 0, GL_RG8);
-        terrainImagesBuffer->normal[i].makeResident(GL_WRITE_ONLY);
-        terrainImagesBuffer->roughness[i] = virtualTextures.roughness.getImageHandle(i, false, 0, GL_R8);
-        terrainImagesBuffer->roughness[i].makeResident(GL_WRITE_ONLY);
-        terrainImagesBuffer->metal[i] = virtualTextures.metallic.getImageHandle(i, false, 0, GL_R8);
-        terrainImagesBuffer->metal[i].makeResident(GL_WRITE_ONLY);
+        //terrainImagesBuffer->albedo[i] = virtualTextures.albedo.getImageHandle(i, false, 0, GL_RGBA8);
+        //terrainImagesBuffer->albedo[i].makeResident(GL_WRITE_ONLY);
+        virtFrameBuffers[i].texture(GL_COLOR_ATTACHMENT0, virtualTextures.albedo, i);
+        //terrainImagesBuffer->normal[i] = virtualTextures.normal.getImageHandle(i, false, 0, GL_RG8);
+        //terrainImagesBuffer->normal[i].makeResident(GL_WRITE_ONLY);
+        virtFrameBuffers[i].texture(GL_COLOR_ATTACHMENT1, virtualTextures.normal, i);
+        //terrainImagesBuffer->roughness[i] = virtualTextures.roughness.getImageHandle(i, false, 0, GL_R8);
+        //terrainImagesBuffer->roughness[i].makeResident(GL_WRITE_ONLY);
+        virtFrameBuffers[i].texture(GL_COLOR_ATTACHMENT2, virtualTextures.roughness, i);
+        //terrainImagesBuffer->metal[i] = virtualTextures.metallic.getImageHandle(i, false, 0, GL_R8);
+        //terrainImagesBuffer->metal[i].makeResident(GL_WRITE_ONLY);
+        virtFrameBuffers[i].texture(GL_COLOR_ATTACHMENT3, virtualTextures.metallic, i);
+        virtFrameBuffers[i].drawBuffers({
+            GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3
+        });
     }
     terrainImagesBuffer->commitment = commitmentTex.getImageHandle(0, false, 0, GL_R32F);
     terrainImagesBuffer->commitment.makeResident(GL_READ_WRITE);
 
     auto virtTexCommitment = [&](glm::uvec2 p, glm::uvec2 size, int level, bool commitment) {
         virtualTextures.albedo.pageCommitment(level, p.x, p.y, 0, size.x, size.y, 1, commitment);
-        virtualTextures.emissive.pageCommitment(level, p.x, p.y, 0, size.x, size.y, 1, commitment);
+        //virtualTextures.emissive.pageCommitment(level, p.x, p.y, 0, size.x, size.y, 1, commitment);
         virtualTextures.normal.pageCommitment(level, p.x, p.y, 0, size.x, size.y, 1, commitment);
         virtualTextures.roughness.pageCommitment(level, p.x, p.y, 0, size.x, size.y, 1, commitment);
         virtualTextures.metallic.pageCommitment(level, p.x, p.y, 0, size.x, size.y, 1, commitment);
@@ -216,17 +218,17 @@ void run() {
 
     int mintail = 8;
     mintail = glm::min(mintail, virtualTextures.albedo.getParameteri(GL_NUM_SPARSE_LEVELS_ARB));
-    mintail = glm::min(mintail, virtualTextures.emissive.getParameteri(GL_NUM_SPARSE_LEVELS_ARB));
     mintail = glm::min(mintail, virtualTextures.roughness.getParameteri(GL_NUM_SPARSE_LEVELS_ARB));
     mintail = glm::min(mintail, virtualTextures.metallic.getParameteri(GL_NUM_SPARSE_LEVELS_ARB));
     mintail = glm::min(mintail, virtualTextures.normal.getParameteri(GL_NUM_SPARSE_LEVELS_ARB));
 
     //todo commit the tail
 
+    floor.gl.vertexArray.bind();
     for(int i = mintail - 1; i >= 0; i--) {
         std::cout << i << std::endl;
         virtTexCommitment({0, 0}, glm::uvec2(pageSize), i, true);
-        genInfoBuffer.invalidate();
+        /*genInfoBuffer.invalidate();
         genInfoBuffer->size = glm::ivec2(pageSize);
         genInfoBuffer->offset = {0, 0};
         genInfoBuffer->lod = i;
@@ -235,8 +237,21 @@ void run() {
         terrainImagesBuffer.bind(1);
         genTextureBuffer.bind(0);
         glDispatchCompute(pageSize.x, pageSize.y, 1);
-        glMemoryBarrier(GL_ALL_BARRIER_BITS);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);*/
+        virtFrameBuffers[i].bind();
+        glViewport(0, 0, pageSize.x, pageSize.y);
+        pipeGenShd.use();
+        genInfoBuffer.invalidate();
+        genInfoBuffer->size = glm::vec2(pageSize) / 512.0f;
+        genInfoBuffer->offset = {0, 0};
+        genInfoBuffer->lod = i;
+        genTextureBuffer.bind(0);
+        genInfoBuffer.bind(1);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3);
     }
+
+    wagl::gl::FrameBuffer::unbind();
     //virtTexCommitment({0,0}, glm::uvec2(pageSize), 7, true);
     //virtTexCommitment({0,0}, glm::uvec2(pageSize), 6, true);
     //virtTexCommitment({0,0}, glm::uvec2(pageSize), 5, true);

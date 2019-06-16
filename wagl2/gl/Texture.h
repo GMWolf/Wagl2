@@ -134,13 +134,17 @@ namespace wagl::gl {
 
         void pageCommitment(GLint level, glm::uvec3 offset, glm::uvec3 size, bool commit);
 
+        glm::ivec3 getPageSize() const;
+
     protected:
 
         void storage3D_internal(GLsizei width, GLsizei height, GLsizei depth, GLsizei levels, GLenum internalFormat);
 
         void storage2D_internal(GLsizei width, GLsizei height, GLsizei levels, GLenum internalFormat);
 
+        const GLenum target;
         GLsizei width, height, depth, levels;
+        GLenum format;
     };
 
     glm::ivec3 getFormatPageSize(GLenum target, GLenum format);
