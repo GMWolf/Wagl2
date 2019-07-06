@@ -8,77 +8,73 @@
 #include <glm/glm.hpp>
 #include <util/Matrix.h>
 #include <queue>
+#include <memory>
+#include <array>
 
 class VirtualTextureMap {
 public:
-    union {
-        struct {
-            wagl::gl::Texture albedo;
-            wagl::gl::Texture metal;
-            wagl::gl::Texture roughness;
-            wagl::gl::Texture normal;
-            wagl::gl::Texture emissive;
-        };
-        wagl::gl::Texture textures[5];
-    };
 
-    GLenum formats[5] {
-            GL_RGBA8,
-            GL_R8,
-            GL_R8,
-            GL_RG8,
-            GL_RGBA8
-    };
+    wagl::gl::Texture albedo;
+    wagl::gl::Texture metalRoughnessNormal;
+
+    /* 0 1 *
+     * 2 2 */
 
     struct Page {
-        size_t level;
-        glm::uvec2 coord;
+        size_t level; //mip level
+        glm::uvec2 imageCoord; //coordinates on image
         bool committed;
         bool valid;
+
+        std::unique_ptr<Page[]> children {};
     };
 
     glm::uvec2 size;
     glm::uvec2 pageSize;
+    int levels;
 
     wagl::gl::Texture commitment;
 
-    VirtualTextureMap(glm::uvec2 size, size_t levels);
-
-private:
-    std::deque<Page*> commitmentQueue;
-
-    struct Node {
-        Page page;
-        Node* children[4];
-    };
-
-    wagl::Matrix<Node> baseNodes;
+    explicit VirtualTextureMap(glm::uvec2 size);
 
     template<class L>
-    void traverseNode(Node& node, L fun);
+    void traversePages(L fun);
 
-    template<class L>
-    void traverse(L fun);
+    void subdiv(Page& page) {
+        assert(page.level > 0);
+        page.children = std::make_unique<Page[]>(4);
+        for(unsigned int i = 0; i < 4; i++) {
+            page.children[i].level = page.level - 1;
+            page.children[i].committed = false;
+            page.children[i].valid = false;
+        }
+    }
 
     void commitPage(Page& page);
+
+    std::deque<Page*> commitmentQueue;
+    Page basePage;
+private:
+    template<class L>
+    void traversePages(Page& page, L fun);
 };
 
 
 template<class L>
-void VirtualTextureMap::traverseNode(VirtualTextureMap::Node &node, L fun) {
-    fun(node);
+void VirtualTextureMap::traversePages(VirtualTextureMap::Page &page, L fun) {
+    fun(page);
     for(int ic = 0; ic < 4; ic++) {
-        if (node.children[ic]) {
-            traverseNode(*node.children[ic], fun);
+        if (page.children) {
+            for(int i = 0; i < 4; i++) {
+                traverseNode(page.children[i], fun);
+            }
         }
     }
 }
 
 template<class L>
-void VirtualTextureMap::traverse(L fun) {
-    for(auto& node : baseNodes) {
-        traverseNode(node, fun);
-    }
+void VirtualTextureMap::traversePages(L fun) {
+    traverseNode(basePage, fun);
 }
 
 

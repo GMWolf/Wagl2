@@ -17,14 +17,12 @@ layout (binding = 1) uniform InfoBlock {
 in vec2 texCoord;
 
 layout(location = 0) out vec3 outAlbedo;
-layout(location = 1) out vec2 outNormal;
-layout(location = 2) out float outRoughness;
-layout(location = 3) out float outMetallic;
+layout(location = 1) out vec4 outRoughMetalNormal;
 void main() {
-
     vec2 uv = (offset + (texCoord * pow(2,lod))) * size;
     outAlbedo = textureLod(textures.albedo, uv, lod).rgb;
-    outNormal = textureLod(textures.normal, uv, lod).xy;
-    outRoughness = textureLod(textures.roughness, uv, lod).x;
-    outMetallic = textureLod(textures.metal, uv, lod).x;
+    outRoughMetalNormal.r = textureLod(textures.roughness, uv, lod).x;
+    outRoughMetalNormal.g = textureLod(textures.metal, uv, lod).x;
+    outRoughMetalNormal.ba = textureLod(textures.normal, uv, lod).xy;
+    //outAlbedo = vec3(1,1,1);
 }

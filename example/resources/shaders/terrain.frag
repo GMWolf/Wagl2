@@ -14,9 +14,7 @@ in Vertex {
 
 layout(binding = TEXTURE_BLOCK_BINDING) uniform Textures {
     sampler2D albedo;
-    sampler2D metal;
-    sampler2D roughness;
-    sampler2D normal;
+    sampler2D metalRoughNormal;
 
     sampler2D commitment;
 } textures;
@@ -39,11 +37,11 @@ PBRFragment samplePBR() {
     float maxLod = availableLod(IN.texCoord);
 
     vec4 albedo = sampleSparse(textures.albedo, IN.texCoord, maxLod);
-    vec4 metal = sampleSparse(textures.metal, IN.texCoord, maxLod);
-    vec4 normal = sampleSparse(textures.normal, IN.texCoord, maxLod);
-    vec4 roughness = sampleSparse(textures.roughness, IN.texCoord, maxLod);
+    vec4 metalRoughNormal = sampleSparse(textures.metalRoughNormal, IN.texCoord, maxLod);
+
 
     //rebuild normals
+    vec3 normal = vec3(metalRoughNormal.zw, 0);
     normal = normal * 2.0 - 1.0;
     normal.z = sqrt(1 - dot(normal.xy, normal.xy));
     normal.xy = normal.yx;
@@ -53,8 +51,8 @@ PBRFragment samplePBR() {
 
     PBRFragment f;
     f.albedo = albedo.xyz;
-    f.metalicity = metal.r;
-    f.roughness = roughness.r;
+    f.metalicity = metalRoughNormal.x;
+    f.roughness = metalRoughNormal.y;
     f.emmisivity = vec3(0,0,0);
     f.normal = perturb_normal(N, IN.view, IN.texCoord, normal.xyz );
     //f.normal = vec3(0,1,0);
@@ -73,6 +71,7 @@ void main() {
 
     outColor.rgb = color(f, l, normalize(IN.view));
     //outColor.rgb = 0.1f + texture(textures.commitment, IN.texCoord).rgb / 8.0f;
-    //outColor.rgb = f.normal;
+    //outColor.rgb = texture(textures.commitment, IN.texCoord).rgb;
+    outColor.rgb = f.albedo;
     outColor.a = 1;
 }
