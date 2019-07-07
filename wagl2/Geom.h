@@ -22,6 +22,42 @@ namespace wagl {
         bool contains(glm::vec<2, E> p) const {
             return glm::all(glm::lessThanEqual(min, p) && glm::greaterThan(max, p));
         }
+
+
+        rect_t<T> operator+(glm::vec<2, T> p) const {
+            return {
+                min + p,
+                max + p
+            };
+        };
+        rect_t<T> operator-(glm::vec<2, T> p) const {
+            return {
+                min - p,
+                max - p
+            };
+        }
+
+        rect_t<T> operator-(T p) const {
+            return {
+                    min - p,
+                    max - p
+            };
+        }
+
+        rect_t<T> operator*(glm::vec<2, T> p) const {
+            return {
+                min * p,
+                max * p
+            };
+        }
+
+        rect_t<T> operator*(T t) const {
+            return {
+                min * t,
+                max * t
+            };
+        }
+
     };
 
     using rect = rect_t<float>;

@@ -2,6 +2,7 @@
 // Created by felix on 07/06/2019.
 //
 
+#include <iostream>
 #include "CameraController.h"
 
 static glm::vec3 xzProject(glm::vec3 in) {
@@ -78,4 +79,8 @@ void CameraController::updateCamera(float dt) {
 
     camera.transform.position.y += vspeed;
 
+
+    if(window.getKey(GLFW_KEY_E)) {
+        std::cout << camera.transform.position.x << " " << camera.transform.position.z << std::endl;
+    }
 }

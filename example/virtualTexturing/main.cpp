@@ -16,6 +16,7 @@
 #include "VirtualTextureMap.h"
 #include <shaders/fullscreen.h>
 #include "Quadtree.h"
+#include "Geom.h"
 
 struct SceneInfo {
     glm::mat4 VP;
@@ -27,6 +28,8 @@ struct TerrainTextures {
     wagl::gl::TextureHandle metalRoughNormal;
 
     wagl::gl::TextureHandle commitment;
+
+    float levels;
 };
 
 struct GenTexture {
@@ -49,17 +52,30 @@ struct GenerationInfo {
  */
 glm::uvec2 getPageCoord(uint64_t node) {
 
-    size_t depth = Quadtree::getNodeDepth(node);
+    if (node == Quadtree::rootNodeCode()) {
+        return {0, 0};
+    }
+
+    size_t nodeDepth = Quadtree::getNodeDepth(node);
 
     glm::uvec2 coord = {0, 0};
 
-    for(size_t level = 0; level < depth; level++) {
-        uint64_t quadrant = (node >> (2 * level));
+    for(size_t depth = 0; depth < nodeDepth; depth++) {
+        uint64_t quadrant = Quadtree::getLevelCode(node, depth);
         glm::uvec2 offset = glm::uvec2{quadrant & 0b01u ? 1 : 0, quadrant & 0b10u ? 1 : 0};
         coord = 2u * coord + offset;
     }
 
     return coord;
+}
+
+wagl::rect getPageUv(uint64_t node) {
+    size_t depth = Quadtree::getNodeDepth(node);
+    size_t pageCount = 1 << depth;
+    wagl::rect uv;
+    uv.min = glm::vec2(getPageCoord(node)) / float(pageCount);
+    uv.max = glm::vec2(getPageCoord(node) + 1u) / float(pageCount);
+    return uv;
 }
 
 void run() {
@@ -79,11 +95,12 @@ void run() {
     CameraController cameraController {app.window, camera};
 
     wagl::Mesh floor;
+    float floorHalfSize = 100;
     floor.data.vertices = {
-            {{-100, 0, -100}, {0, 1, 0}, {0,0}},
-            {{-100, 0, 100}, {0, 1, 0}, {0, 1}},
-            {{100, 0, -100}, {0, 1, 0}, {1, 0}},
-            {{100, 0, 100}, {0, 1, 0}, {1, 1}}
+            {{-floorHalfSize, 0, -floorHalfSize}, {0, 1, 0}, {0,0}},
+            {{-floorHalfSize, 0, floorHalfSize}, {0, 1, 0}, {0, 1}},
+            {{floorHalfSize, 0, -floorHalfSize}, {0, 1, 0}, {1, 0}},
+            {{floorHalfSize, 0, floorHalfSize}, {0, 1, 0}, {1, 1}}
     };
     floor.data.elements = {
             0, 1, 2, 2, 1, 3
@@ -129,15 +146,21 @@ void run() {
     };
 
 
+    glm::uvec2 pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_R11F_G11F_B10F);
+    pageSize = glm::max(pageSize, glm::uvec2( wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_RGBA8)));
+    std::cout << "pagesize " << pageSize.x << " " << pageSize.y << std::endl;
+
     glm::uvec2 texSize = {2048 * 4, 2048 * 4};
-    size_t texLevels = 5;
+    int texLevels = 0;
+    while(texSize.x / (1u << texLevels) >= pageSize.x) texLevels++;
+    std::cout << "levels" << texLevels << std::endl;
+
     wagl::gl::Texture albedo(GL_TEXTURE_2D);
     albedo.storage2DSparse(texSize, texLevels, GL_R11F_G11F_B10F);
     wagl::gl::Texture metalRoughNormal(GL_TEXTURE_2D);
     metalRoughNormal.storage2DSparse(texSize, texLevels, GL_RGBA8);
 
-    glm::uvec2 pageSize = albedo.getPageSize();
-    pageSize = glm::max(pageSize, glm::uvec2(metalRoughNormal.getPageSize()));
+
 
     wagl::gl::Texture commitment(GL_TEXTURE_2D);
     commitment.storage2D(texSize / pageSize, 1, GL_R32F);
@@ -154,6 +177,7 @@ void run() {
 
     Quadtree q;
     std::vector<uint64_t> batchAdd;
+    std::vector<uint64_t> batchRemove;
 
     auto commitPage = [&](uint64_t node) {
         q.add(node);
@@ -164,46 +188,18 @@ void run() {
         metalRoughNormal.pageCommitment(level, {texelCoord, 0}, {pageSize, 1}, true);
 
         commitment.subClear(0, {pageCoord * (1u << level), 0} , {glm::uvec2(1u << level), 1}, (float)level);
-        std::cout << level << std::endl;
-        std::cout << (pageCoord * (1u << level)).x << std::endl;
-        std::cout << glm::uvec2(1u << level).x << std::endl;
     };
 
-    commitPage(q.rootNodeCode());
+    auto uncommitPage = [&](uint64_t node) {
+        q.remove(node);
+        auto pageCoord = getPageCoord(node);
+        auto texelCoord = pageCoord * pageSize;
+        auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
+        albedo.pageCommitment(level, {texelCoord, 0}, {pageSize, 1}, false);
+        metalRoughNormal.pageCommitment(level, {texelCoord, 0}, {pageSize, 1}, false);
 
-    pipeGenShd.use();
-    floor.gl.vertexArray.bind();
-    wagl::UniformBuffer<GenerationInfo> genInfoBuffer;
-    for(int i = 0; i < 10; i++) {
-        q.traversePotentialNodes([&](uint64_t node) {
-            if (((node & 0b11u) == 0) && Quadtree::getNodeDepth(node) < texLevels) {
-                batchAdd.push_back(node);
-            }
-        });
-
-        for(auto p : batchAdd) {
-            commitPage(p);
-            uint64_t level = texLevels - Quadtree::getNodeDepth(p) - 1;
-
-            frameBuffers[level].bind();
-
-            genInfoBuffer.invalidate();
-            auto coord = getPageCoord(p);
-            genInfoBuffer->lod = level;
-            genInfoBuffer->offset = coord;
-            genInfoBuffer->size = glm::vec2(1);
-            genInfoBuffer.bind(1);
-            genTex.bind(0);
-
-            glViewport(coord.x * pageSize.x, coord.y * pageSize.y, pageSize.x, pageSize.y);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-            std::cout << std::bitset<64>(p) << std::endl;
-        }
-
-        batchAdd.clear();
-    }
-
-    wagl::gl::FrameBuffer::unbind();
+        commitment.subClear(0, {pageCoord * (1u << level), 0} , {glm::uvec2(1u << level), 1}, (float)level + 1);
+    };
 
     wagl::UniformBuffer<wagl::Transform> transformBlock;
     *transformBlock = {
@@ -221,9 +217,77 @@ void run() {
     terrainTexturesBuffer->albedo.makeResident();
     terrainTexturesBuffer->metalRoughNormal.makeResident();
     terrainTexturesBuffer->commitment.makeResident();
+    terrainTexturesBuffer->levels = texLevels;
+
+    {
+        auto uv = getPageUv(0b0111);
+        wagl::rect pageWorldCoords = (uv * 2.0f - 1.0f) * floorHalfSize;
+
+        std::cout << pageWorldCoords.min.x << " " << pageWorldCoords.min.y << " " << pageWorldCoords.max.x << " " << pageWorldCoords.max.y << std::endl;
+    }
+
 
     app.run([&](float dt) {
         cameraController.updateCamera(dt);
+
+        //Generate pages
+        pipeGenShd.use();
+        floor.gl.vertexArray.bind();
+        wagl::UniformBuffer<GenerationInfo> genInfoBuffer;
+        //pages to add
+        q.traversePotentialNodes([&](uint64_t node) {
+            auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
+
+            if (level >= 0) {
+                auto uvs = getPageUv(node);
+                auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
+                if (pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
+                    batchAdd.push_back(node);
+                }
+            }
+        });
+
+        //pages to remove
+        q.traverseLeafNodes([&](uint64_t node) {
+            auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
+            auto uvs = getPageUv(node);
+            auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
+            if (!pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
+                batchRemove.push_back(node);
+            }
+        });
+
+        for(auto p : batchRemove) {
+            uncommitPage(p);
+        }
+
+        for(auto p : batchAdd) {
+            commitPage(p);
+            uint64_t level = texLevels - Quadtree::getNodeDepth(p) - 1;
+
+            frameBuffers[level].bind();
+
+            genInfoBuffer.invalidate();
+            auto coord = getPageCoord(p);
+            genInfoBuffer->lod = level;
+            genInfoBuffer->offset = coord;
+            genInfoBuffer->size = glm::vec2(1);
+            genInfoBuffer.bind(1);
+            genTex.bind(0);
+
+            glViewport(coord.x * pageSize.x, coord.y * pageSize.y, pageSize.x, pageSize.y);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+
+        batchAdd.clear();
+        batchRemove.clear();
+
+        wagl::gl::FrameBuffer::unbind();
+
+        //commitment.subClear(0, {0,0, 0}, {texSize/pageSize, 1}, 4.0f);
+
+        //Render frame
+
 
         glViewport(0, 0, app.window.getWidth(), app.window.getHeight());
         glEnable(GL_DEPTH_TEST);

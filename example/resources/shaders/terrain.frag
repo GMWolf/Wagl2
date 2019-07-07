@@ -17,6 +17,7 @@ layout(binding = TEXTURE_BLOCK_BINDING) uniform Textures {
     sampler2D metalRoughNormal;
 
     sampler2D commitment;
+    float levels;
 } textures;
 
 float availableLod(vec2 uv) {
@@ -70,7 +71,7 @@ void main() {
     l.radiance = vec3(1) * 5;
 
     outColor.rgb = color(f, l, normalize(IN.view));
-    //outColor.rgb = 0.1f + texture(textures.commitment, IN.texCoord).rgb / 8.0f;
+    outColor.rgb = 1.0f - texture(textures.commitment, IN.texCoord).rgb / textures.levels;
     //outColor.rgb = texture(textures.commitment, IN.texCoord).rgb;
     outColor.rgb = f.albedo;
     outColor.a = 1;
