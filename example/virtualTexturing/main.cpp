@@ -17,6 +17,8 @@
 #include <shaders/fullscreen.h>
 #include "Quadtree.h"
 #include "Geom.h"
+#include <random>
+#include <glm/gtx/rotate_vector.hpp>
 
 struct SceneInfo {
     glm::mat4 VP;
@@ -48,6 +50,19 @@ struct TexToBufferInfo {
     wagl::gl::TextureHandle tex;
     int lod;
 };
+
+struct DecalTextures {
+    wagl::gl::TextureHandle albedo;
+    wagl::gl::TextureHandle alpha;
+    wagl::gl::TextureHandle normal;
+    wagl::gl::TextureHandle roughness;
+};
+
+struct DecalGenInfo {
+    glm::mat4 proj;
+};
+
+thread_local std::default_random_engine randomGenerator(0);
 
 /**
  * Gets page coordinate in pages.
@@ -128,6 +143,57 @@ void run() {
         wagl::gl::Texture roughness = wagl::loadTexture("resources/textures/soil/Soil_2x2_1K_roughness.dds");
     } soilTextures {};
 
+    struct {
+        wagl::gl::Texture albedo = wagl::loadTexture("resources/textures/decals/grass/Debris_DriedGrass01_albedo.dds");
+        wagl::gl::Texture alpha = wagl::loadTexture("resources/textures/decals/grass/Debris_DriedGrass01_alpha.dds");
+        wagl::gl::Texture height = wagl::loadTexture("resources/textures/decals/grass/Debris_DriedGrass01_height.dds");
+        wagl::gl::Texture normal = wagl::loadTexture("resources/textures/decals/grass/Debris_DriedGrass01_normal.dds");
+        wagl::gl::Texture roughness = wagl::loadTexture("resources/textures/decals/grass/Debris_DriedGrass01_roughness.dds");
+    } decalTextures;
+
+    wagl::Mesh decalsMesh;
+    {
+        std::uniform_real_distribution<float> positionDistribution(-floorHalfSize, floorHalfSize);
+        std::uniform_real_distribution<float> sizeDistribution(0.5, 4);
+        std::uniform_real_distribution<float> rotationDistribution(0, 2 * glm::pi<float>());
+        for (int i = 0; i < 1000; i++) {
+            glm::vec2 pos{
+                    positionDistribution(randomGenerator),
+                    positionDistribution(randomGenerator)
+            };
+
+            float a = rotationDistribution(randomGenerator);
+            float s = sizeDistribution(randomGenerator);
+
+            glm::vec2 pa = glm::rotate(glm::vec2(-s), a) + pos;
+            glm::vec2 pb = glm::rotate(glm::vec2(s), a) + pos;
+
+            wagl::Mesh::Vertex vertices[4];
+            vertices[0].position = {glm::rotate(glm::vec2(-s, -s), a) + pos, 0.0f};
+            vertices[1].position = {glm::rotate(glm::vec2(-s,  s), a) + pos, 0.0f};
+            vertices[2].position = {glm::rotate(glm::vec2( s, -s), a) + pos, 0.0f};
+            vertices[3].position = {glm::rotate(glm::vec2( s,  s), a) + pos, 0.0f};
+            vertices[0].normal = vertices[1].normal = vertices[2].normal = vertices[3].normal = {0,1,0};
+            vertices[0].texcoord = {0, 0};
+            vertices[1].texcoord = {0, 1};
+            vertices[2].texcoord = {1, 0};
+            vertices[3].texcoord = {1, 1};
+
+
+            for(int j = 0; j < 4; j++) {
+                decalsMesh.data.vertices.push_back(vertices[j]);
+            }
+
+            size_t indices[] = {0, 1, 2, 2, 1, 3};
+
+
+            for(auto e : indices) {
+                decalsMesh.data.elements.push_back(e + (i * 4));
+            }
+        }
+        decalsMesh.update();
+    }
+
     wagl::UniformBuffer<GenTexture> genTex;
     genTex->albedo = soilTextures.albedo.getHandle();
     genTex->albedo.makeResident();
@@ -135,6 +201,18 @@ void run() {
     genTex->roughness.makeResident();
     genTex->normal = soilTextures.normal.getHandle();
     genTex->normal.makeResident();
+
+    wagl::UniformBuffer<DecalTextures> decalTexBuffer;
+    decalTexBuffer->albedo = decalTextures.albedo.getHandle();
+    decalTexBuffer->albedo.makeResident();
+    decalTexBuffer->alpha = decalTextures.alpha.getHandle();
+    decalTexBuffer->alpha.makeResident();
+    decalTexBuffer->roughness = decalTextures.roughness.getHandle();
+    decalTexBuffer->roughness.makeResident();
+    decalTexBuffer->normal = decalTextures.normal.getHandle();
+    decalTexBuffer->normal.makeResident();
+
+    wagl::UniformBuffer<DecalGenInfo> decalGenInfo;
 
     wagl::gl::Shader terrainShader {
             {GL_VERTEX_SHADER, wagl::loadFileGLSL("resources/shaders/shader.vert",  "resources/shaders")},
@@ -150,6 +228,10 @@ void run() {
             {GL_COMPUTE_SHADER, wagl::loadFileGLSL("resources/shaders/texToBuffer.glsl", "resources/shaders")}
     };
 
+    wagl::gl::Shader decalShader {
+            {GL_VERTEX_SHADER, wagl::loadFileGLSL("resources/shaders/decalGen.vert", "resources/shaders")},
+            {GL_FRAGMENT_SHADER, wagl::loadFileGLSL("resources/shaders/decalGen.frag", "resources/shaders")}
+    };
 
     glm::uvec2 pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_R11F_G11F_B10F);
     pageSize = glm::max(pageSize, glm::uvec2( wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_RGBA8)));
@@ -277,9 +359,6 @@ void run() {
                 auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
                 auto uvs = getPageUv(node);
                 auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
-                /*if (!pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
-                    batchRemove.push_back(node);
-                }*/
                 auto d = (1 << (texLevels - Quadtree::getNodeDepth(node))) * distMultiplier;
                 if (glm::distance(pageWorldCoords.center(), glm::vec2(camera.transform.position.x, camera.transform.position.z)) > d) {
                     batchRemove.push_back(node);
@@ -298,7 +377,6 @@ void run() {
 
         //pages to copy
         for(auto p : copyBatch) {
-            std::cout << p << std::endl;
             commitPage(p);
             auto level = texLevels - Quadtree::getNodeDepth(p) - 1;
             auto coord = getPageCoord(p);
@@ -360,9 +438,15 @@ void run() {
         });
         for(auto p : genBatch) {
             uint64_t level = texLevels - Quadtree::getNodeDepth(p) - 1;
+            auto coord = getPageCoord(p);
+
+            auto uvs = getPageUv(p);
+            auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
+
+            //Generate soil
             genFrameBuffer.bind();
             genInfoBuffer.invalidate();
-            auto coord = getPageCoord(p);
+
             genInfoBuffer->lod = level;
             genInfoBuffer->offset = coord;
             genInfoBuffer->size = glm::vec2(1);
@@ -371,6 +455,15 @@ void run() {
 
             glViewport(0, 0, pageSize.x, pageSize.y);
             glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            //decals!
+            decalGenInfo.invalidate();
+            decalGenInfo->proj = glm::ortho(pageWorldCoords.min.x, pageWorldCoords.max.x, pageWorldCoords.min.y, pageWorldCoords.max.y);
+            decalGenInfo.bind(0);
+            decalTexBuffer.bind(1);
+            decalShader.use();
+            decalsMesh.gl.vertexArray.bind();
+            glDrawElements(GL_TRIANGLES, decalsMesh.gl.count, GL_UNSIGNED_SHORT, nullptr);
 
             compressBatch.push_back(p);
             break; //only do one per frame for now.
