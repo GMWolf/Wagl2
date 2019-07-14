@@ -27,3 +27,7 @@ void wagl::gl::FrameBuffer::unbind() {
 void wagl::gl::FrameBuffer::bind() {
     glBindFramebuffer(GL_FRAMEBUFFER, id);
 }
+
+void wagl::gl::FrameBuffer::read(GLenum mode) {
+    glNamedFramebufferReadBuffer(id, mode);
+}

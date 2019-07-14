@@ -34,7 +34,6 @@ struct TerrainTextures {
 
 struct GenTexture {
     wagl::gl::TextureHandle albedo;
-    wagl::gl::TextureHandle metal;
     wagl::gl::TextureHandle roughness;
     wagl::gl::TextureHandle normal;
 };
@@ -42,6 +41,11 @@ struct GenTexture {
 struct GenerationInfo {
     glm::vec2 offset;
     glm::vec2 size;
+    int lod;
+};
+
+struct TexToBufferInfo {
+    wagl::gl::TextureHandle tex;
     int lod;
 };
 
@@ -89,13 +93,13 @@ void run() {
     camera.fovy = glm::radians(45.0f);
     camera.zfar = 1000;
     camera.znear = 0.1;
-    camera.transform.position = {-100, 1.75, -100};
+    camera.transform.position = {0, 1.75, 0};
     camera.transform.orientation = glm::quatLookAt(glm::vec3{0,0,-1}, {0,1,0});
 
     CameraController cameraController {app.window, camera};
 
     wagl::Mesh floor;
-    float floorHalfSize = 100;
+    float floorHalfSize = 50;
     floor.data.vertices = {
             {{-floorHalfSize, 0, -floorHalfSize}, {0, 1, 0}, {0,0}},
             {{-floorHalfSize, 0, floorHalfSize}, {0, 1, 0}, {0, 1}},
@@ -119,21 +123,18 @@ void run() {
     };
 
     struct {
-        wagl::gl::Texture albedo = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_albedo.dds");
-        wagl::gl::Texture metallic = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_metallic.dds");
-        wagl::gl::Texture normal = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_normal.dds");
-        wagl::gl::Texture roughness = wagl::loadTexture("resources/textures/sci-fi_panel/Scifi_Panel4_1K_roughness.dds");
-    } matTextures {};
+        wagl::gl::Texture albedo = wagl::loadTexture("resources/textures/soil/Soil_2x2_1K_albedo.dds");
+        wagl::gl::Texture normal = wagl::loadTexture("resources/textures/soil/Soil_2x2_1K_normal.dds");
+        wagl::gl::Texture roughness = wagl::loadTexture("resources/textures/soil/Soil_2x2_1K_roughness.dds");
+    } soilTextures {};
 
     wagl::UniformBuffer<GenTexture> genTex;
-    genTex->albedo = matTextures.albedo.getHandle();
+    genTex->albedo = soilTextures.albedo.getHandle();
     genTex->albedo.makeResident();
-    genTex->roughness = matTextures.roughness.getHandle();
+    genTex->roughness = soilTextures.roughness.getHandle();
     genTex->roughness.makeResident();
-    genTex->normal = matTextures.normal.getHandle();
+    genTex->normal = soilTextures.normal.getHandle();
     genTex->normal.makeResident();
-    genTex->metal = matTextures.metallic.getHandle();
-    genTex->metal.makeResident();
 
     wagl::gl::Shader terrainShader {
             {GL_VERTEX_SHADER, wagl::loadFileGLSL("resources/shaders/shader.vert",  "resources/shaders")},
@@ -145,38 +146,61 @@ void run() {
             {GL_FRAGMENT_SHADER, wagl::loadFileGLSL("resources/shaders/terrainGen.frag", "resources/shaders")}
     };
 
+    wagl::gl::Shader texToBuffer {
+            {GL_COMPUTE_SHADER, wagl::loadFileGLSL("resources/shaders/texToBuffer.glsl", "resources/shaders")}
+    };
+
 
     glm::uvec2 pageSize = wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_R11F_G11F_B10F);
     pageSize = glm::max(pageSize, glm::uvec2( wagl::gl::getFormatPageSize(GL_TEXTURE_2D, GL_RGBA8)));
     std::cout << "pagesize " << pageSize.x << " " << pageSize.y << std::endl;
 
-    glm::uvec2 texSize = {2048 * 4, 2048 * 4};
+    glm::uvec2 texSize = {2048 * 8, 2048 * 8};
     int texLevels = 0;
     while(texSize.x / (1u << texLevels) >= pageSize.x) texLevels++;
     std::cout << "levels" << texLevels << std::endl;
+    GLint maxTexSize;
+    glGetIntegerv(GL_MAX_SPARSE_TEXTURE_SIZE_ARB, &maxTexSize);
+    std::cout << "max tex size " << maxTexSize << std::endl;
+
+    glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &maxTexSize);
+    std::cout << "max layers " << maxTexSize << std::endl;
 
     wagl::gl::Texture albedo(GL_TEXTURE_2D);
-    albedo.storage2DSparse(texSize, texLevels, GL_R11F_G11F_B10F);
+    albedo.storage2DSparse(texSize, texLevels, GL_RGB10);
     wagl::gl::Texture metalRoughNormal(GL_TEXTURE_2D);
     metalRoughNormal.storage2DSparse(texSize, texLevels, GL_RGBA8);
-
 
 
     wagl::gl::Texture commitment(GL_TEXTURE_2D);
     commitment.storage2D(texSize / pageSize, 1, GL_R32F);
 
-    wagl::gl::FrameBuffer frameBuffers[texLevels];
-    for(size_t i = 0; i < texLevels; i++) {
-        frameBuffers[i].texture(GL_COLOR_ATTACHMENT0, albedo, i);
-        frameBuffers[i].texture(GL_COLOR_ATTACHMENT1, metalRoughNormal, i);
-        frameBuffers[i].drawBuffers({
-            GL_COLOR_ATTACHMENT0,
-            GL_COLOR_ATTACHMENT1
-        });
-    }
+    struct {
+        wagl::gl::Texture albedo = wagl::gl::Texture(GL_TEXTURE_2D);
+        wagl::gl::Texture roughMetalNormal = wagl::gl::Texture(GL_TEXTURE_2D);
+    } stagingTextures;
+    stagingTextures.albedo.storage2D(pageSize, 1, GL_RGB10);
+    stagingTextures.roughMetalNormal.storage2D(pageSize, 1, GL_RGBA8);
+    stagingTextures.albedo.getHandle().makeResident();
+    stagingTextures.roughMetalNormal.getHandle().makeResident();
+
+    struct {
+        wagl::gl::Buffer albedo = wagl::gl::Buffer();
+        wagl::gl::Buffer roughMetalNotmal = wagl::gl::Buffer();
+    } pbos;
+    pbos.albedo.storage(pageSize.x * pageSize.y * 4 * 4, nullptr, 0);
+    pbos.roughMetalNotmal.storage(pageSize.x * pageSize.y * 4 * 4, nullptr, 0);
+
+
+    wagl::gl::FrameBuffer genFrameBuffer;
+    genFrameBuffer.texture(GL_COLOR_ATTACHMENT0, stagingTextures.albedo, 0);
+    genFrameBuffer.texture(GL_COLOR_ATTACHMENT1, stagingTextures.roughMetalNormal, 0);
+    genFrameBuffer.drawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
 
     Quadtree q;
-    std::vector<uint64_t> batchAdd;
+    std::vector<uint64_t> genBatch;
+    std::vector<uint64_t> compressBatch;
+    std::vector<uint64_t> copyBatch;
     std::vector<uint64_t> batchRemove;
 
     auto commitPage = [&](uint64_t node) {
@@ -219,6 +243,9 @@ void run() {
     terrainTexturesBuffer->commitment.makeResident();
     terrainTexturesBuffer->levels = texLevels;
 
+    wagl::UniformBuffer<TexToBufferInfo> texToBufferInfoBuffer;
+
+
     {
         auto uv = getPageUv(0b0111);
         wagl::rect pageWorldCoords = (uv * 2.0f - 1.0f) * floorHalfSize;
@@ -234,39 +261,106 @@ void run() {
         pipeGenShd.use();
         floor.gl.vertexArray.bind();
         wagl::UniformBuffer<GenerationInfo> genInfoBuffer;
-        //pages to add
+
+        float distMultiplier = 1.5;
+
+        //pages to remove
+        if (app.window.getKey(GLFW_KEY_R)) {
+            q.traverseNodes([&](uint64_t node) {
+                batchRemove.push_back(node);
+            });
+            compressBatch.clear();
+            copyBatch.clear();
+            genBatch.clear();
+        } else {
+            q.traverseLeafNodes([&](uint64_t node) {
+                auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
+                auto uvs = getPageUv(node);
+                auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
+                /*if (!pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
+                    batchRemove.push_back(node);
+                }*/
+                auto d = (1 << (texLevels - Quadtree::getNodeDepth(node))) * distMultiplier;
+                if (glm::distance(pageWorldCoords.center(), glm::vec2(camera.transform.position.x, camera.transform.position.z)) > d) {
+                    batchRemove.push_back(node);
+                }
+            });
+        }
+
+        std::sort(batchRemove.begin(), batchRemove.end(), [](uint64_t a, uint64_t b) {
+            return a > b;
+        });
+
+        for(auto p : batchRemove) {
+            uncommitPage(p);
+        }
+        batchRemove.clear();
+
+        //pages to copy
+        for(auto p : copyBatch) {
+            std::cout << p << std::endl;
+            commitPage(p);
+            auto level = texLevels - Quadtree::getNodeDepth(p) - 1;
+            auto coord = getPageCoord(p);
+
+            pbos.albedo.bind(GL_PIXEL_UNPACK_BUFFER);
+            albedo.subimage2D(level, coord.x * pageSize.x, coord.y * pageSize.y, pageSize.x, pageSize.y, GL_RGBA, GL_FLOAT, nullptr);
+
+            pbos.roughMetalNotmal.bind(GL_PIXEL_UNPACK_BUFFER);
+            metalRoughNormal.subimage2D(level, coord.x * pageSize.x, coord.y * pageSize.y, pageSize.x, pageSize.y, GL_RGBA, GL_FLOAT, nullptr);
+
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        }
+
+        copyBatch.clear();
+
+        for(auto p : compressBatch) {
+            texToBuffer.use();
+            pbos.albedo.bindRange(GL_SHADER_STORAGE_BUFFER, 1, 0, pbos.albedo.size);
+
+            texToBufferInfoBuffer.invalidate();
+            texToBufferInfoBuffer->tex = stagingTextures.albedo.getHandle();
+            texToBufferInfoBuffer->lod = 0;
+            texToBufferInfoBuffer.bind(0);
+            glDispatchCompute(pageSize.x, pageSize.y, 1);
+
+            pbos.roughMetalNotmal.bindRange(GL_SHADER_STORAGE_BUFFER, 1, 0, pbos.roughMetalNotmal.size);
+            texToBufferInfoBuffer.invalidate();
+            texToBufferInfoBuffer->tex = stagingTextures.roughMetalNormal.getHandle();
+            texToBufferInfoBuffer->lod = 0;
+            texToBufferInfoBuffer.bind(0);
+            glDispatchCompute(pageSize.x, pageSize.y, 1);
+
+            copyBatch.push_back(p);
+        }
+
+        compressBatch.clear();
+
+        //pages to generate
         q.traversePotentialNodes([&](uint64_t node) {
             auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
 
             if (level >= 0) {
                 auto uvs = getPageUv(node);
                 auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
-                if (pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
+                /*if (pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
                     batchAdd.push_back(node);
+                }*/
+                auto d = (1 << (texLevels - Quadtree::getNodeDepth(node))) * distMultiplier;
+                auto distance = glm::distance(pageWorldCoords.center(), glm::vec2(camera.transform.position.x, camera.transform.position.z));
+                //std::cout << distance << " " << d << std::endl;
+                if (distance < d) {
+                    genBatch.push_back(node);
                 }
             }
         });
 
-        //pages to remove
-        q.traverseLeafNodes([&](uint64_t node) {
-            auto level = texLevels - Quadtree::getNodeDepth(node) - 1;
-            auto uvs = getPageUv(node);
-            auto pageWorldCoords = (uvs * 2.0f - 1.0f) * floorHalfSize;
-            if (!pageWorldCoords.contains(glm::vec2(camera.transform.position.x, camera.transform.position.z))) {
-                batchRemove.push_back(node);
-            }
+        std::sort(genBatch.begin(), genBatch.end(), [](uint64_t a, uint64_t b){
+            return a < b;
         });
-
-        for(auto p : batchRemove) {
-            uncommitPage(p);
-        }
-
-        for(auto p : batchAdd) {
-            commitPage(p);
+        for(auto p : genBatch) {
             uint64_t level = texLevels - Quadtree::getNodeDepth(p) - 1;
-
-            frameBuffers[level].bind();
-
+            genFrameBuffer.bind();
             genInfoBuffer.invalidate();
             auto coord = getPageCoord(p);
             genInfoBuffer->lod = level;
@@ -275,12 +369,15 @@ void run() {
             genInfoBuffer.bind(1);
             genTex.bind(0);
 
-            glViewport(coord.x * pageSize.x, coord.y * pageSize.y, pageSize.x, pageSize.y);
+            glViewport(0, 0, pageSize.x, pageSize.y);
             glDrawArrays(GL_TRIANGLES, 0, 3);
+
+            compressBatch.push_back(p);
+            break; //only do one per frame for now.
         }
 
-        batchAdd.clear();
-        batchRemove.clear();
+        genBatch.clear();
+
 
         wagl::gl::FrameBuffer::unbind();
 

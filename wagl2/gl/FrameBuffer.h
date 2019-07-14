@@ -11,7 +11,7 @@
 
 namespace wagl::gl {
 
-    class FrameBuffer : Object {
+    class FrameBuffer : public Object {
     public:
         FrameBuffer();
 
@@ -27,6 +27,8 @@ namespace wagl::gl {
         void drawBuffers(std::initializer_list<GLenum> attachements);
 
         void bind();
+
+        void read(GLenum mode);
 
         static void unbind();
     };

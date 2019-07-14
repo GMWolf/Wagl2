@@ -23,6 +23,9 @@ namespace wagl {
             return glm::all(glm::lessThanEqual(min, p) && glm::greaterThan(max, p));
         }
 
+        glm::vec<2, T> center() const {
+            return (min + max) / T(2);
+        };
 
         rect_t<T> operator+(glm::vec<2, T> p) const {
             return {
