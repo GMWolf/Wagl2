@@ -79,25 +79,25 @@ void wagl::Context::_dropCallback(GLFWwindow *window, int count, const char **pa
     if(ctx->dropCallback) ctx->dropCallback(ctx, count, paths);
 }
 
-int wagl::Context::getKey(int key) {
+int wagl::Context::getKey(int key) const {
     return glfwGetKey(window, key);
 }
 
-int wagl::Context::getMouseButton(int button) {
+int wagl::Context::getMouseButton(int button) const {
     return glfwGetMouseButton(window, button);
 }
 
-glm::vec2 wagl::Context::getMousePos() {
+glm::vec2 wagl::Context::getMousePos() const {
     double posx, posy;
     glfwGetCursorPos(window, &posx, &posy);
     return glm::vec2(posx, posy);
 }
 
-void wagl::Context::setMousePos(glm::vec2 pos) {
+void wagl::Context::setMousePos(glm::vec2 pos) const {
     glfwSetCursorPos(window, pos.x, pos.y);
 }
 
-bool wagl::Context::shouldClose() {
+bool wagl::Context::shouldClose() const {
     return static_cast<bool>(glfwWindowShouldClose(window));
 }
 
@@ -108,7 +108,6 @@ void wagl::Context::close() {
 bool wagl::Context::opened() {
     return window != nullptr;
 }
-
 
 
 wagl::Window::Window(int width, int height, const char* title, const Context* shared) :

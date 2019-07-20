@@ -39,12 +39,13 @@ namespace wagl {
         Context& operator=(const Context&) = delete;
         Context& operator=(Context&&) noexcept = default;
 
-        int getKey(int key);
-        int getMouseButton(int button);
-        glm::vec2 getMousePos();
-        void setMousePos(glm::vec2 pos);
+        int getKey(int key) const;
+        int getMouseButton(int button) const;
+        glm::vec2 getMousePos() const;
+        void setMousePos(glm::vec2 pos) const;
 
-        bool shouldClose();
+
+        bool shouldClose() const;
         void close();
 
         bool opened();
