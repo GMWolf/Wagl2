@@ -183,8 +183,16 @@ void wagl::gl::Texture::subClear(GLint level, glm::uvec3 a, glm::uvec3 size, flo
     glClearTexSubImage(id, level, a.x, a.y, a.z, size.x, size.y, size.z, GL_RED, GL_FLOAT, &value);
 }
 
+void wagl::gl::Texture::subClear(GLint level, glm::uvec3 a, glm::uvec3 size, GLint value) {
+    glClearTexSubImage(id, level, a.x, a.y, a.z, size.x, size.y, size.z, GL_RED, GL_UNSIGNED_INT, &value);
+}
+
 glm::ivec3 wagl::gl::Texture::getPageSize() const {
     return getFormatPageSize(target, format);
+}
+
+void wagl::gl::Texture::label(const std::string &name) {
+    glObjectLabel(GL_TEXTURE, id, name.length(), name.c_str());
 }
 
 
@@ -212,7 +220,6 @@ void wagl::gl::Sampler::parameter(GLenum name, GLfloat param) {
     glSamplerParameterf(id, name, param);
 }
 
-
 glm::ivec3 wagl::gl::getFormatPageSize(GLenum target, GLenum format) {
     glm::ivec3 result;
     glGetInternalformativ( GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_X_ARB, 1, &result.x);
@@ -220,6 +227,3 @@ glm::ivec3 wagl::gl::getFormatPageSize(GLenum target, GLenum format) {
     glGetInternalformativ( GL_TEXTURE_2D, format, GL_VIRTUAL_PAGE_SIZE_Z_ARB, 1, &result.z);
     return result;
 }
-
-
-

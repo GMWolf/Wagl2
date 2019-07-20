@@ -9,6 +9,7 @@
 #include <vector>
 #include "Object.h"
 #include "../util/Utils.h"
+#include <string>
 
 namespace wagl::gl {
 
@@ -21,6 +22,8 @@ namespace wagl::gl {
             BaseBuffer(BaseBuffer &&) = default;
 
             BaseBuffer &operator=(BaseBuffer &&) = default;
+
+            void label(const std::string& name);
 
             void bindRange(GLenum target, GLuint index, GLintptr offset, GLsizeiptr size) const;
 

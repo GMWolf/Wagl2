@@ -25,6 +25,8 @@ namespace wagl {
         public:
 
             Shader(std::initializer_list<std::pair<GLenum, std::string>> sources);
+            Shader(Shader&&) = default;
+            Shader& operator=(Shader&&) = default;
 
             ~Shader();
 

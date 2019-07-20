@@ -73,3 +73,7 @@ void wagl::gl::BaseBuffer::bindRange(GLenum target, GLuint index, GLintptr offse
 void wagl::gl::BaseBuffer::bind(GLenum target) const {
     glBindBuffer(target, id);
 }
+
+void wagl::gl::BaseBuffer::label(const std::string &name) {
+    glObjectLabel(GL_BUFFER, id, name.length(), name.c_str());
+}

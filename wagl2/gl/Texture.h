@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <variant>
 #include <glm/glm.hpp>
+#include <string>
 
 namespace wagl::gl {
 
@@ -78,6 +79,8 @@ namespace wagl::gl {
 
         Texture &operator=(const Texture &) = delete;
 
+        void label(const std::string& name);
+
         void storage2D(GLsizei width, GLsizei height, GLsizei levels, GLenum internalFormat);
         void storage2D(glm::ivec2 size, GLsizei levels, GLenum internalFormat);
         void storage2DSparse(GLsizei width, GLsizei height, GLsizei levels, GLenum internalFormat);
@@ -105,6 +108,7 @@ namespace wagl::gl {
         void clear(GLint level, GLuint value);
 
         void subClear(GLint level, glm::uvec3 a, glm::uvec3 size, float value);
+        void subClear(GLint level, glm::uvec3 a, glm::uvec3 size, GLint value);
 
         TextureHandle getHandle();
 
