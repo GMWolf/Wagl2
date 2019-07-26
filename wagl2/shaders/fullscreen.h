@@ -9,8 +9,7 @@
 #include <tuple>
 #include <string>
 
-namespace wagl {
-    namespace shd {
+namespace wagl::shd {
         const std::pair<GLenum, std::string> vs_fullscreen = { GL_VERTEX_SHADER,
             R"(#version 430 core
                 out vec2 texCoord;
@@ -25,6 +24,5 @@ namespace wagl {
             )"
         };
     }
-}
 
 #endif //WAGL2_FULLSCREEN_H

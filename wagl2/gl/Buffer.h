@@ -95,7 +95,8 @@ namespace wagl::gl {
 
 template<class T>
 void wagl::gl::Buffer::bufferData(const std::vector<T> &data) {
-    bufferData(sizeof(T) + data.size(), data.data());
+    assert(sizeof(T) * data.size() <= size);
+    bufferData(sizeof(T) * data.size(), data.data());
 }
 
 template<class T>
