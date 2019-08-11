@@ -61,6 +61,11 @@ namespace wagl {
             };
         }
 
+        rect_t<T>& operator*=(glm::vec<2, T> p) {
+            *this = *this * p;
+            return *this;
+        }
+
     };
 
     using rect = rect_t<float>;
