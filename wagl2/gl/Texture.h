@@ -102,6 +102,9 @@ namespace wagl::gl {
         void submimage3D(GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height,
                          GLsizei depth, GLenum format, GLenum type, const void *data);
 
+        void subimage3DCompressed(GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height,
+                GLsizei depth, GLenum format,  GLsizei imageSize, const void *data);
+
         void clear(GLint level, float value);
 
         void clear(GLint level, glm::vec3 value);

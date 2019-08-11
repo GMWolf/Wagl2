@@ -168,6 +168,11 @@ void wagl::gl::Texture::compressedSubmiage2D(GLint level, GLint xoffset, GLint y
     glCompressedTextureSubImage2D(id, level, xoffset, yoffset, width, height, format, imageSize, data);
 }
 
+void wagl::gl::Texture::subimage3DCompressed(GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width,
+                                             GLsizei height, GLsizei depth, GLenum format, GLsizei imageSize, const void *data) {
+    glCompressedTextureSubImage3D(id, level, xoffset, yoffset, zoffset, width, height, depth, format, imageSize, data);
+}
+
 void wagl::gl::Texture::clear(GLint level, float value) {
     glClearTexImage(id, level, GL_RED, GL_FLOAT, &value);
 }
@@ -199,8 +204,6 @@ glm::ivec3 wagl::gl::Texture::getPageSize() const {
 void wagl::gl::Texture::label(const std::string &name) {
     glObjectLabel(GL_TEXTURE, id, name.length(), name.c_str());
 }
-
-
 
 
 wagl::gl::Sampler::Sampler() {
