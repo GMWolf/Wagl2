@@ -51,7 +51,7 @@ add_library(Wagl2
         SparseTextureAtlas.h
         util/Matrix.h
         VirtualTexture.cpp
-        VirtualTexture.h ui/UI.h debug/DebugDraw.cpp debug/DebugDraw.h debug/DebugShaders.h)
+        VirtualTexture.h ui/UI.h debug/DebugDraw.cpp debug/DebugDraw.h debug/DebugShaders.h gl/Indirect.h)
 
 target_link_libraries(Wagl2 PUBLIC glfw glad glm gli tinygltf stb)
 target_include_directories(Wagl2 PUBLIC .)
